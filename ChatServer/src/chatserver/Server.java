@@ -16,13 +16,14 @@ import java.sql.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+
 class Maps{
 	static Map<String,Socket> mapUserToSocket=new HashMap<String,Socket>();
 	  static Map<Socket,String> mapSocketToUser=new HashMap<Socket,String>();
 	  static DataFetch d1=new DataFetch();
 }
 
-class users{
+/*class users{
 	int id;
   String name,username,dob;
   public users(String username,String name,String dob){		
@@ -30,7 +31,7 @@ class users{
           this.username=username;
           this.dob=dob;
   }	
-}
+}*/
 
 class DataFetch {
 	ResultSet rs2;
@@ -52,10 +53,9 @@ class DataFetch {
 
 
 class Server1 implements Runnable{
-  Socket senderSocket = null;
-  String name,user;
-	String[] tokens;
-	Map<String,users> mapName;              
+	  Socket senderSocket = null;
+	  String name,user;
+	  String[] tokens;              
   
   public void run() {
       if(senderSocket == null)
@@ -63,7 +63,6 @@ class Server1 implements Runnable{
 
       try {
           InputStream is = senderSocket.getInputStream();
-
           InputStreamReader isr = new InputStreamReader(is);
           BufferedReader br = new BufferedReader(isr);
           char[] msg = new char[1024];
@@ -104,7 +103,7 @@ class Server1 implements Runnable{
       if(tokens[0].equals("CHAT")){
           System.out.println("read ");
           if(tokens[1].equals("CON")){
-          	SendMSGonConn(senderSocket,"Connection Established");
+          	sendMSGtoSender(senderSocket,"Connection Established");
           }
           else if(tokens[1].equals("LOGIN")) {
                Maps.d1.fetchData();
@@ -134,24 +133,43 @@ class Server1 implements Runnable{
                        if(b) {
                     	   Maps.mapSocketToUser.put(senderSocket,tokens[2]);
                            Maps.mapUserToSocket.put(tokens[2],senderSocket);
-                           SendMSGonConn(senderSocket, msg);
+                           System.out.println("Added");
+                           for(Map.Entry<Socket,String> map:Maps.mapSocketToUser.entrySet()) {
+                        	   System.out.println(map.getValue());
+                           }
+                           sendMSGtoSender(senderSocket, msg);
                            System.out.println("msg : "+msg);
                        }
                        else {
-                           SendMSGonConn(senderSocket, msg);
+                           sendMSGtoSender(senderSocket, msg);
                        }
-                       //Maps.d1.con.close();
                  }      
                  catch(Exception e) {
               	   System.out.println(e);
                  }
           }
+          else if(tokens[1].equals("REGISTER")){
+              try{
+            	  Maps.d1.fetchData();
+                  Maps.d1.rs2.next();
+                  int i=Maps.d1.rs2.getInt(1)+1;
+                  Maps.d1.stmt.executeUpdate("INSERT INTO user VALUES ('"+i+"','"+tokens[2]+"','"+
+                  tokens[3]+"','"+tokens[4]+"','"+tokens[5]+"')");
+                  String msg="Registered Successfully";
+                  sendMSGtoSender(senderSocket, msg);
+              }
+              catch(SQLException e){
+                  System.out.println(e);
+              } 
+          }
           else if(tokens[1].equals("MSG")){
-              if(Maps.mapUserToSocket.containsKey(tokens[1])) {
+              if(Maps.mapUserToSocket.containsKey(tokens[2])) {
+            	  System.out.println("User Online");
               	SendMsg(tokens[2],tokens[3]);
               }
               else {
-              	SendMsg(Maps.mapSocketToUser.get(senderSocket),"User Offline");
+            	  System.out.println("User offline");
+              	sendMSGtoSender(senderSocket,"User Offline");
               }
           }
           else if(tokens[1].equals("LGT")){
@@ -163,12 +181,12 @@ class Server1 implements Runnable{
 
 	void Logout(String userName){
 		Socket sender=Maps.mapUserToSocket.get(userName);		
-      Maps.mapUserToSocket.remove(userName);
-      Maps.mapSocketToUser.remove(sender);
-      System.out.println("Logged out successfully");
+        Maps.mapUserToSocket.remove(userName);
+        Maps.mapSocketToUser.remove(sender);
+        System.out.println("Logged out successfully");
 	}
 
-	void SendMSGonConn(Socket recieverSocket,String msg) {
+	void sendMSGtoSender(Socket recieverSocket,String msg) {
 		String data="";
 		String senderName="Server";
 		data="CHAT:MSGFROM:"+senderName+":"+msg;
@@ -212,6 +230,7 @@ class Server1 implements Runnable{
           {
              bw.flush();
              bw.write(data);
+             System.out.println("sent data 1st time: "+data);
              bw.flush();
           }
           else{return;}
